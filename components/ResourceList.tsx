@@ -34,8 +34,10 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
   // Infinite Scroll State
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [hasMore, setHasMore] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef({ isFetching: false, isLoading: false, hasMore: true, hasRecords: false });
 
   const { query, result: listData } = useList<any>({
     resource,
@@ -97,18 +99,37 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
     return () => clearTimeout(handler);
   }, [searchValue]);
 
+  // Set mounted after initial render
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Keep ref in sync with latest values
+  useEffect(() => {
+    loadingRef.current = { isFetching, isLoading, hasMore, hasRecords: allRecords.length > 0 };
+  }, [isFetching, isLoading, hasMore, allRecords.length]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const scrollContainer = scrollContainerRef.current;
+    const target = observerTarget.current;
+
+    if (!scrollContainer || !target) return;
+
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !isFetching && !isLoading && allRecords.length > 0) {
+        const { isFetching, isLoading, hasMore, hasRecords } = loadingRef.current;
+        if (entries[0].isIntersecting && hasMore && !isFetching && !isLoading && hasRecords) {
           setCurrent(prev => prev + 1);
         }
       },
-      { threshold: 0.1, root: scrollContainerRef.current, rootMargin: '200px' }
+      { threshold: 0.1, root: scrollContainer, rootMargin: '200px' }
     );
-    if (observerTarget.current) observer.observe(observerTarget.current);
+
+    observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, isFetching, isLoading, allRecords.length, current]);
+  }, [resource, isMounted]);
 
   // Selection Logic
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
