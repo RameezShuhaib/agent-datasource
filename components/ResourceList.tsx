@@ -34,8 +34,6 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
   // Infinite Scroll State
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [hasMore, setHasMore] = useState(true);
-  const [isMounted, setIsMounted] = useState(false);
-  const observerTarget = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef({ isFetching: false, isLoading: false, hasMore: true, hasRecords: false });
 
@@ -99,37 +97,33 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
     return () => clearTimeout(handler);
   }, [searchValue]);
 
-  // Set mounted after initial render
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Keep ref in sync with latest values
+  // Keep ref in sync with latest values for scroll handler
   useEffect(() => {
     loadingRef.current = { isFetching, isLoading, hasMore, hasRecords: allRecords.length > 0 };
   }, [isFetching, isLoading, hasMore, allRecords.length]);
 
+  // Scroll-based infinite loading
   useEffect(() => {
-    if (!isMounted) return;
-
     const scrollContainer = scrollContainerRef.current;
-    const target = observerTarget.current;
+    if (!scrollContainer) return;
 
-    if (!scrollContainer || !target) return;
+    const handleScroll = () => {
+      const { isFetching, isLoading, hasMore, hasRecords } = loadingRef.current;
 
-    const observer = new IntersectionObserver(
-      entries => {
-        const { isFetching, isLoading, hasMore, hasRecords } = loadingRef.current;
-        if (entries[0].isIntersecting && hasMore && !isFetching && !isLoading && hasRecords) {
-          setCurrent(prev => prev + 1);
-        }
-      },
-      { threshold: 0.1, root: scrollContainer, rootMargin: '200px' }
-    );
+      if (!hasMore || isFetching || isLoading || !hasRecords) return;
 
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [resource, isMounted]);
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+      // Load more when within 200px of bottom
+      if (distanceFromBottom < 200) {
+        setCurrent(prev => prev + 1);
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, [resource]);
 
   // Selection Logic
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -515,8 +509,8 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
             </tbody>
           </table>
 
-          {/* Observer Sentinel */}
-          <div ref={observerTarget} className="w-full py-12 flex flex-col items-center justify-center gap-4 bg-slate-900/50">
+          {/* Loading indicator */}
+          <div className="w-full py-12 flex flex-col items-center justify-center gap-4 bg-slate-900/50">
             {isFetching || isLoading ? (
               <div className="flex items-center gap-3">
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-700 border-t-blue-500"></div>
