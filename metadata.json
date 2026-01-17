@@ -1,0 +1,6 @@
+
+{
+  "name": "Agent DataSource",
+  "description": "A browser-based database management dashboard powered by Refine Core and SQL.js, demonstrating full CRUD operations on an in-memory SQLite database.",
+  "requestFramePermissions": []
+}
