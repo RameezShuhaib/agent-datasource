@@ -1,25 +1,3 @@
-
-/**
- * Simple CSV Generator
- */
-export const generateCSV = (data: any[], headers: string[]): string => {
-  const escape = (val: any) => {
-    if (val === null || val === undefined) return '';
-    const str = String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
-
-  const headerRow = headers.join(',');
-  const bodyRows = data.map(row => 
-    headers.map(header => escape(row[header])).join(',')
-  ).join('\n');
-
-  return `${headerRow}\n${bodyRows}`;
-};
-
 /**
  * Simple CSV Parser (Handles quoted strings)
  */

@@ -36,10 +36,11 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
   const [hasMore, setHasMore] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef({ isFetching: false, isLoading: false, hasMore: true, hasRecords: false });
+  const processedDataKeyRef = useRef<string>('');
 
   const { query, result: listData } = useList<any>({
     resource,
-    pagination: { current, pageSize: PAGE_SIZE, mode: "server" } as any,
+    pagination: { currentPage: current, pageSize: PAGE_SIZE, mode: "server" },
     sorters,
     filters,
     queryOptions: {
@@ -51,8 +52,8 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
   const { isLoading, isFetching, refetch } = query;
   const { mutateAsync: updateMutate } = useUpdate();
   const { mutateAsync: createMutate } = useCreate();
-  // Fix: isPending does not exist on useDeleteMany return type, use isLoading instead
-  const { mutateAsync: deleteManyMutate, isLoading: isDeleting } = useDeleteMany();
+  const { mutateAsync: deleteManyMutate, mutation: deleteMutation } = useDeleteMany();
+  const isDeleting = deleteMutation.isPending;
 
   useEffect(() => {
     getTableColumns(resource).then(meta => setColumns(meta));
@@ -67,16 +68,25 @@ export const ResourceList: React.FC<ResourceListProps> = ({ resource }) => {
     setEditingCell(null);
     setIsCreatingRow(false);
     setNewRowData({});
+    processedDataKeyRef.current = '';
   }, [resource]);
 
   useEffect(() => {
     setAllRecords([]);
     setCurrent(1);
     setHasMore(true);
+    processedDataKeyRef.current = '';
   }, [filters, sorters]);
 
   useEffect(() => {
     if (listData?.data) {
+      // Create a key based on page and record IDs to detect actual data changes
+      const dataKey = `${current}-${listData.data.length}-${listData.data.map((d: any) => d.id).join(',')}`;
+
+      // Skip if we've already processed this exact data
+      if (dataKey === processedDataKeyRef.current) return;
+      processedDataKeyRef.current = dataKey;
+
       setAllRecords(prev => {
         if (current === 1) return listData.data;
         const combinedMap = new Map();

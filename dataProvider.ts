@@ -53,9 +53,9 @@ export const sqlDataProvider: DataProvider = {
 
     let limitClause = "";
     if (pagination) {
-      const current = (pagination as any).current || 1;
+      const currentPage = (pagination as any).currentPage || 1;
       const pageSize = pagination.pageSize || 10;
-      const offset = (current - 1) * pageSize;
+      const offset = (currentPage - 1) * pageSize;
       limitClause = ` LIMIT ${pageSize} OFFSET ${offset}`;
     }
 

@@ -1,18 +1,6 @@
 
 const API_URL = "https://personal-mcp-database.me8468.workers.dev/TIPANDTOES_DB/execute";
 
-const logQuery = (sql: string, params?: any, results?: any) => {
-  console.log(
-    `%c[REMOTE SQL] Executing:%c ${sql.replace(/\s+/g, ' ').trim()}`,
-    'color: #8b5cf6; font-weight: bold;',
-    'color: #1e293b; font-family: monospace;',
-    params ? { params } : ''
-  );
-  if (results && Array.isArray(results) && results.length > 0) {
-    console.table(results);
-  }
-};
-
 /**
  * Core function to execute queries against the remote D1 database
  */
@@ -45,7 +33,6 @@ export const remoteExecute = async (sql: string, params: any[] = []): Promise<an
       }
     }
 
-    logQuery(sql, params, finalData);
     return finalData;
   } catch (err) {
     console.error("[REMOTE SQL ERROR]", err);
