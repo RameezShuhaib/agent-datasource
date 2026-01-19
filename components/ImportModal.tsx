@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { parseCSV } from '../utils/csv';
-import { execQuery, getTableColumns, ColumnMetadata } from '../sqlDatabase';
+import { execQuery, getTableColumns, ColumnMetadata, uploadCSV } from '../sqlDatabase';
 
 interface ImportModalProps {
   resource: string;
@@ -10,6 +10,7 @@ interface ImportModalProps {
 }
 
 export const ImportModal: React.FC<ImportModalProps> = ({ resource, onClose, onSuccess }) => {
+  const [file, setFile] = useState<File | null>(null);
   const [fileData, setFileData] = useState<{ headers: string[], rows: any[] } | null>(null);
   const [mode, setMode] = useState<'append' | 'replace'>('append');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -21,11 +22,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({ resource, onClose, onS
   }, [resource]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
 
     try {
-      const text = await file.text();
+      setFile(selectedFile);
+      const text = await selectedFile.text();
       const parsed = parseCSV(text);
       setFileData(parsed);
     } catch (err) {
@@ -34,40 +36,19 @@ export const ImportModal: React.FC<ImportModalProps> = ({ resource, onClose, onS
   };
 
   const validateAndImport = async () => {
-    if (!fileData) return;
+    if (!file || !fileData) return;
     setIsProcessing(true);
 
     try {
-      const safeResource = `"${resource.replace(/"/g, '""')}"`;
-      
+      // For replace mode, delete existing data first
       if (mode === 'replace') {
+        const safeResource = `"${resource.replace(/"/g, '""')}"`;
         await execQuery(`DELETE FROM ${safeResource}`);
       }
 
-      const nonPkCols = columns.filter(c => !c.pk);
-      const colNamesEscaped = nonPkCols.map(c => `"${c.name.replace(/"/g, '""')}"`);
-
-      let count = 0;
-      for (const row of fileData.rows) {
-        const vals = nonPkCols.map(col => {
-          let val = row[col.name];
-          if (val === undefined && col.name === 'id_original') {
-            val = row['id'] || row['ID'] || row['Id'];
-          }
-          if (val === undefined) val = null;
-
-          const type = col.type.toUpperCase();
-          if (type.includes('INT')) return parseInt(val, 10) || 0;
-          if (type.includes('REAL') || type.includes('FLOAT') || type.includes('NUM')) return parseFloat(val) || 0;
-          return val === null ? '' : String(val);
-        });
-
-        const placeholders = colNamesEscaped.map(() => '?').join(', ');
-        await execQuery(`INSERT INTO ${safeResource} (${colNamesEscaped.join(', ')}) VALUES (${placeholders})`, vals);
-        count++;
-      }
-
-      onSuccess(count);
+      // Use the new upload endpoint
+      const result = await uploadCSV(file, resource, 'append');
+      onSuccess(result.rows_inserted);
     } catch (err: any) {
       console.error("Import failed:", err);
       alert(`Import failed: ${err.message}`);
@@ -108,7 +89,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ resource, onClose, onS
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Data Preview (Top 5 Rows)</h4>
-                  <button onClick={() => setFileData(null)} className="text-xs text-blue-400 font-bold hover:underline">Pick different file</button>
+                  <button onClick={() => { setFile(null); setFileData(null); }} className="text-xs text-blue-400 font-bold hover:underline">Pick different file</button>
                 </div>
                 <div className="border border-slate-700 rounded-lg overflow-hidden">
                   <table className="min-w-full divide-y divide-slate-700 text-[11px]">

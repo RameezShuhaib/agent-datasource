@@ -1,5 +1,7 @@
 
-const API_URL = "https://personal-mcp-database.me8468.workers.dev/TIPANDTOES_DB/execute";
+const API_BASE = "https://personal-mcp-database.me8468.workers.dev/TIPANDTOES_DB";
+const API_URL = `${API_BASE}/execute`;
+const UPLOAD_URL = `${API_BASE}/upload`;
 
 /**
  * Core function to execute queries against the remote D1 database
@@ -95,7 +97,7 @@ export const createTable = async (tableName: string, columns: { name: string, ty
 
 export const createTableFromCSV = async (tableName: string, headers: string[], rows: any[]) => {
   const safeTableName = `"${tableName.replace(/"/g, '""')}"`;
-  
+
   const processedHeaders = headers.map(h => {
     const clean = h.trim().toLowerCase();
     if (clean === 'id') return 'id_original';
@@ -104,14 +106,48 @@ export const createTableFromCSV = async (tableName: string, headers: string[], r
 
   const safeHeaderNames = processedHeaders.map(h => `"${h.replace(/"/g, '""')}"`);
   const colDefs = safeHeaderNames.map(h => `${h} TEXT`).join(', ');
-  
+
   const createQuery = `CREATE TABLE ${safeTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${colDefs})`;
   await remoteExecute(createQuery);
-  
+
   for (const row of rows) {
     const placeholders = headers.map(() => '?').join(', ');
     const insertQuery = `INSERT INTO ${safeTableName} (${safeHeaderNames.join(', ')}) VALUES (${placeholders})`;
     const vals = headers.map(h => row[h]);
     await remoteExecute(insertQuery, vals);
   }
+};
+
+export interface UploadCSVResponse {
+  success: boolean;
+  table: string;
+  mode: string;
+  columns: string[];
+  rows_inserted: number;
+}
+
+/**
+ * Upload CSV file to create or append to a table
+ */
+export const uploadCSV = async (
+  file: File,
+  tableName: string,
+  mode: 'create' | 'append' = 'append'
+): Promise<UploadCSVResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('table', tableName);
+  formData.append('mode', mode);
+
+  const response = await fetch(UPLOAD_URL, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
 };
